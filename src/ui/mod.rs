@@ -10,7 +10,9 @@ use ratatui::widgets::{
 };
 use ratatui::{Frame, Terminal};
 
-use crate::{AppState, SelectedMenu, SubMenuState};
+use crate::ui::state::{AppState, SelectedMenu, SubMenuState};
+
+pub mod state;
 
 /// Render the UI with various lists.
 pub fn render(frame: &mut Frame, app_state: &mut AppState) {
@@ -61,6 +63,7 @@ pub fn render_left_list(
     is_selected: bool,
 ) {
     let items: Vec<ListItem> = app_state
+        .dir_list
         .curr_list
         .iter()
         .map(|x| ListItem::new(x.name.clone()))
@@ -68,7 +71,7 @@ pub fn render_left_list(
 
     let b = Block::default()
         .title(Line::from("Source").left_aligned())
-        .title(Line::from(app_state.curr_path.clone()).right_aligned())
+        .title(Line::from(app_state.dir_list.curr_path.clone()).right_aligned())
         .borders(Borders::ALL)
         .border_type(if is_selected {
             BorderType::HeavyDoubleDashed
@@ -81,7 +84,7 @@ pub fn render_left_list(
         .highlight_symbol("> ")
         .block(b);
 
-    frame.render_stateful_widget(list, area, &mut app_state.source_list_state);
+    frame.render_stateful_widget(list, area, &mut app_state.dir_list.list_state);
 }
 
 pub fn render_right_list(
@@ -91,6 +94,7 @@ pub fn render_right_list(
     is_selected: bool,
 ) {
     let items: Vec<ListItem> = app_state
+        .dir_list
         .curr_list
         .iter()
         .map(|x| ListItem::new(x.name.clone()))
@@ -98,7 +102,7 @@ pub fn render_right_list(
 
     let b = Block::default()
         .title(Line::from("Destination").left_aligned())
-        .title(Line::from(app_state.curr_path.clone()).right_aligned())
+        .title(Line::from(app_state.dir_list.curr_path.clone()).right_aligned())
         .borders(Borders::ALL)
         .border_type(if is_selected {
             BorderType::HeavyDoubleDashed
@@ -112,7 +116,7 @@ pub fn render_right_list(
         .highlight_symbol("> ")
         .block(b);
 
-    frame.render_stateful_widget(list, area, &mut app_state.source_list_state);
+    frame.render_stateful_widget(list, area, &mut app_state.dir_list.list_state);
 }
 
 pub fn render_bottom_list(frame: &mut Frame, area: Rect, is_selected: bool) {

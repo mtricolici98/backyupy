@@ -5,131 +5,14 @@ use ratatui::widgets::ListState;
 use std::path::Path;
 
 use crate::config::Args;
-use crate::fs_ops::{FsEntry, FsEntryType, list_dir_own};
+use crate::fs_ops::dir::{FsEntry, FsEntryType, list_dir_own};
+use crate::fs_ops::mounts::Mount;
 use crate::ui::render;
+use crate::ui::state::{AppState, SubMenuState};
 
 mod config;
 mod fs_ops;
 mod ui;
-
-#[derive(Default)]
-struct SubMenuState {
-    curr_path: String,
-    curr_list: Vec<FsEntry>,
-    source_list_state: ListState,
-    source_path_stack: Vec<(usize, String)>,
-    selected_mount: Option<String>,
-}
-
-impl SubMenuState {
-    fn new(start_path: Option<String>) -> Self {
-        let mut instance = SubMenuState::default();
-        if let Some(path) = start_path {
-            instance.curr_list =
-                list_dir_own(&Path::new(&path)).expect("Start path should be accessible");
-            instance.curr_path = path;
-            instance.source_list_state.select(Some(0));
-        }
-        instance
-    }
-
-    fn move_dir(&mut self, selected: Option<usize>) {
-        let Some(selected_idx) = selected else {
-            return;
-        };
-        let Some(selected_item) = self.curr_list.get(selected_idx) else {
-            return;
-        };
-        if selected_item.e_type == FsEntryType::Folder {
-            self.source_path_stack
-                .push((selected_idx, self.curr_path.clone()));
-            self.curr_path = selected_item.abs_path.clone();
-            self.source_list_state.select(Some(0));
-            self.curr_list = list_dir_own(Path::new(&self.curr_path)).expect("To go into folder");
-        }
-    }
-
-    fn pop_dir(&mut self) {
-        let Some((selection, back_to)) = self.source_path_stack.pop() else {
-            return;
-        };
-        self.curr_path = back_to;
-        self.source_list_state.select(Some(selection));
-        self.curr_list = list_dir_own(Path::new(&self.curr_path)).expect("To go into folder");
-    }
-}
-
-#[derive(Default, PartialEq)]
-enum SelectedMenu {
-    #[default]
-    Left,
-    Right,
-    Bottom,
-}
-
-#[derive(Default)]
-struct AppState {
-    start_path: String,
-    left: SubMenuState,
-    right: SubMenuState,
-    selected_state: SelectedMenu,
-}
-
-impl AppState {
-    fn get_state_to_modify(&mut self) -> &mut SubMenuState {
-        if self.selected_state == SelectedMenu::Left {
-            return &mut self.left;
-        } else if self.selected_state == SelectedMenu::Right {
-            return &mut self.right;
-        }
-        return &mut self.left;
-    }
-
-    fn handle_up(&mut self) {
-        let to_modify = self.get_state_to_modify();
-        if to_modify.source_list_state.selected().is_none() {
-            to_modify.source_list_state.select(Some(0))
-        } else {
-            to_modify.source_list_state.select_previous();
-        }
-    }
-
-    fn handle_down(&mut self) {
-        let to_modify = self.get_state_to_modify();
-        to_modify.source_list_state.select_next();
-    }
-
-    fn handle_enter(&mut self) {
-        let to_modify = self.get_state_to_modify();
-        to_modify.move_dir(to_modify.source_list_state.selected());
-    }
-
-    fn handle_esc(&mut self) {
-        self.get_state_to_modify().pop_dir();
-    }
-
-    fn handle_right(&mut self) {
-        if self.selected_state == SelectedMenu::Left {
-            self.selected_state = SelectedMenu::Right;
-            return;
-        }
-        if self.selected_state == SelectedMenu::Right {
-            self.selected_state = SelectedMenu::Bottom;
-            return;
-        }
-    }
-
-    fn handle_left(&mut self) {
-        if self.selected_state == SelectedMenu::Right {
-            self.selected_state = SelectedMenu::Left;
-            return;
-        }
-        if self.selected_state == SelectedMenu::Bottom {
-            self.selected_state = SelectedMenu::Right;
-            return;
-        }
-    }
-}
 
 fn main() -> anyhow::Result<()> {
     let args = Args::parse();
