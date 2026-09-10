@@ -21,7 +21,7 @@ fn main() -> anyhow::Result<()> {
         let mut app_sate = AppState::default();
         app_sate.start_path = args.path.clone();
         app_sate.left = SubMenuState::new(Some(args.path.clone()));
-        app_sate.right = SubMenuState::new(Some("/mnt/".to_string()));
+        app_sate.right = SubMenuState::new(None);
         app_sate.run(terminal)
     })
 }
@@ -37,7 +37,7 @@ impl AppState {
                     KeyCode::Char('q') => break Ok(()),
                     KeyCode::Char('h') | KeyCode::Left => self.handle_left(),
                     KeyCode::Char('l') | KeyCode::Right => self.handle_right(),
-                    KeyCode::Esc => self.handle_esc(),
+                    KeyCode::Char('s') | KeyCode::Esc => self.handle_esc(),
                     KeyCode::Char('w') | KeyCode::Enter => self.handle_enter(),
                     _ => {}
                 }

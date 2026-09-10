@@ -4,7 +4,7 @@ use ratatui::widgets::ListState;
 
 use crate::fs_ops::{
     dir::{FsEntry, FsEntryType, list_dir_own},
-    mounts::Mount,
+    mounts::{Mount, get_avail_mounts},
 };
 
 #[derive(Default, PartialEq)]
@@ -79,9 +79,18 @@ impl MoveUpDown for DirListState {
 
 #[derive(Default)]
 pub struct MountListState {
-    selected_mount: Option<String>,
-    curr_list: Vec<Mount>,
-    list_state: ListState,
+    pub selected_mount: Option<String>,
+    pub curr_list: Vec<Mount>,
+    pub list_state: ListState,
+}
+
+impl MountListState {
+    pub fn new() -> Self {
+        let mut instance = MountListState::default();
+        instance.curr_list = get_avail_mounts();
+        instance.list_state.select(Some(0));
+        instance
+    }
 }
 
 impl MoveUpDown for MountListState {
@@ -114,6 +123,7 @@ impl SubMenuState {
 
         instance.mount_select_allowed = start_path.is_none();
         instance.dir_list = DirListState::new(start_path);
+        instance.mount_list = MountListState::new();
         instance
     }
 }

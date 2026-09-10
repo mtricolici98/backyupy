@@ -10,7 +10,7 @@ use ratatui::widgets::{
 };
 use ratatui::{Frame, Terminal};
 
-use crate::ui::state::{AppState, SelectedMenu, SubMenuState};
+use crate::ui::state::{AppState, MenuMode, SelectedMenu, SubMenuState};
 
 pub mod state;
 
@@ -62,15 +62,49 @@ pub fn render_left_list(
     app_state: &mut SubMenuState,
     is_selected: bool,
 ) {
+    render_dir_list(frame, area, app_state, is_selected, "Source");
+}
+pub fn render_size(size: u64) -> String {
+    const UNITS: [&str; 5] = ["B", "KB", "MB", "GB", "TB"];
+    const BASE: f64 = 1000.0;
+
+    let mut value = size as f64;
+    let mut unit = 0;
+
+    while value >= BASE && unit < UNITS.len() - 1 {
+        value /= BASE;
+        unit += 1;
+    }
+
+    if unit == 0 {
+        format!("{}{}", size, UNITS[unit])
+    } else {
+        format!("{:.1}{}", value, UNITS[unit])
+    }
+}
+
+pub fn render_mount_list(
+    frame: &mut Frame,
+    area: Rect,
+    app_state: &mut SubMenuState,
+    is_selected: bool,
+) {
     let items: Vec<ListItem> = app_state
-        .dir_list
+        .mount_list
         .curr_list
         .iter()
-        .map(|x| ListItem::new(x.name.clone()))
+        .map(|x| {
+            ListItem::new(format!(
+                "{} | {:?} | {}",
+                &x.dev,
+                &x.mounted_to,
+                render_size(x.total_space)
+            ))
+        })
         .collect();
 
     let b = Block::default()
-        .title(Line::from("Source").left_aligned())
+        .title(Line::from("Choose Destination Mount").left_aligned())
         .title(Line::from(app_state.dir_list.curr_path.clone()).right_aligned())
         .borders(Borders::ALL)
         .border_type(if is_selected {
@@ -78,20 +112,26 @@ pub fn render_left_list(
         } else {
             BorderType::Plain
         });
-    let list = List::new(items)
-        .style(Color::White)
-        .highlight_style(Modifier::REVERSED)
-        .highlight_symbol("> ")
-        .block(b);
 
-    frame.render_stateful_widget(list, area, &mut app_state.dir_list.list_state);
+    if !items.is_empty() {
+        let list = List::new(items)
+            .style(Color::White)
+            .highlight_style(Modifier::REVERSED)
+            .highlight_symbol("> ")
+            .block(b);
+        frame.render_stateful_widget(list, area, &mut app_state.mount_list.list_state);
+    } else {
+        let p = Paragraph::new("No mounts found").bold().centered().block(b);
+        frame.render_widget(p, area);
+    }
 }
 
-pub fn render_right_list(
+pub fn render_dir_list(
     frame: &mut Frame,
     area: Rect,
     app_state: &mut SubMenuState,
     is_selected: bool,
+    title: &str,
 ) {
     let items: Vec<ListItem> = app_state
         .dir_list
@@ -101,7 +141,7 @@ pub fn render_right_list(
         .collect();
 
     let b = Block::default()
-        .title(Line::from("Destination").left_aligned())
+        .title(Line::from(title).left_aligned())
         .title(Line::from(app_state.dir_list.curr_path.clone()).right_aligned())
         .borders(Borders::ALL)
         .border_type(if is_selected {
@@ -109,14 +149,31 @@ pub fn render_right_list(
         } else {
             BorderType::Plain
         });
+    if !items.is_empty() {
+        let list = List::new(items)
+            .style(Color::White)
+            .highlight_style(Modifier::REVERSED)
+            .highlight_symbol("> ")
+            .block(b);
 
-    let list = List::new(items)
-        .style(Color::White)
-        .highlight_style(Modifier::REVERSED)
-        .highlight_symbol("> ")
-        .block(b);
+        frame.render_stateful_widget(list, area, &mut app_state.dir_list.list_state);
+    } else {
+        let p = Paragraph::new("Dir Empty").bold().centered().block(b);
+        frame.render_widget(p, area);
+    }
+}
 
-    frame.render_stateful_widget(list, area, &mut app_state.dir_list.list_state);
+pub fn render_right_list(
+    frame: &mut Frame,
+    area: Rect,
+    app_state: &mut SubMenuState,
+    is_selected: bool,
+) {
+    if app_state.menu_mode == MenuMode::Mount {
+        render_mount_list(frame, area, app_state, is_selected);
+    } else {
+        render_dir_list(frame, area, app_state, is_selected, "Destination");
+    }
 }
 
 pub fn render_bottom_list(frame: &mut Frame, area: Rect, is_selected: bool) {
