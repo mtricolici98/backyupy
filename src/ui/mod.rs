@@ -137,7 +137,13 @@ pub fn render_dir_list(
         .dir_list
         .curr_list
         .iter()
-        .map(|x| ListItem::new(x.name.clone()))
+        .map(|x| {
+            ListItem::new(x.name.clone()).style(if x.ignored {
+                Color::Yellow
+            } else {
+                Color::Reset
+            })
+        })
         .collect();
 
     let b = Block::default()

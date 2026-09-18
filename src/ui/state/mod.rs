@@ -3,7 +3,7 @@ use std::path::Path;
 use ratatui::widgets::ListState;
 
 use crate::fs_ops::{
-    dir::{FsEntry, FsEntryType, list_dir_own},
+    dir::{FsEntry, FsEntryType, list_dir_own, mark_for_ignore},
     mounts::{Mount, get_avail_mounts},
 };
 
@@ -49,11 +49,15 @@ impl DirListState {
             return;
         };
         if selected_item.e_type == FsEntryType::Folder {
+            let path = selected_item.abs_path.clone();
+            let Ok(new_list) = list_dir_own(Path::new(&path)) else {
+                return;
+            };
+            self.curr_list = new_list;
             self.source_path_stack
                 .push((selected_idx, self.curr_path.clone()));
-            self.curr_path = selected_item.abs_path.clone();
+            self.curr_path = path;
             self.list_state.select(Some(0));
-            self.curr_list = list_dir_own(Path::new(&self.curr_path)).expect("To go into folder");
         }
     }
 
@@ -178,6 +182,16 @@ impl AppState {
         let to_modify = self.get_state_to_modify();
         if to_modify.menu_mode == MenuMode::Dir {
             to_modify.dir_list.move_dir();
+        }
+    }
+
+    pub fn handle_space(&mut self) {
+        let to_modify = self.get_state_to_modify();
+        if to_modify.menu_mode == MenuMode::Dir {
+            let Some(selected) = to_modify.dir_list.list_state.selected() else {
+                return;
+            };
+            let res = mark_for_ignore(&mut to_modify.dir_list.curr_list, selected);
         }
     }
 

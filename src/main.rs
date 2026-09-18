@@ -5,7 +5,7 @@ use ratatui::widgets::ListState;
 use std::path::Path;
 
 use crate::config::Args;
-use crate::fs_ops::dir::{FsEntry, FsEntryType, list_dir_own};
+use crate::fs_ops::dir::{FsEntry, FsEntryType, get_config, init_config, list_dir_own};
 use crate::fs_ops::mounts::Mount;
 use crate::ui::render;
 use crate::ui::state::{AppState, SubMenuState};
@@ -17,6 +17,7 @@ mod ui;
 fn main() -> anyhow::Result<()> {
     let args = Args::parse();
     color_eyre::install().expect("To work");
+    let _ = init_config(&args.path);
     ratatui::run(|terminal| {
         let mut app_sate = AppState::default();
         app_sate.start_path = args.path.clone();
@@ -39,6 +40,7 @@ impl AppState {
                     KeyCode::Char('l') | KeyCode::Right => self.handle_right(),
                     KeyCode::Char('s') | KeyCode::Esc => self.handle_esc(),
                     KeyCode::Char('w') | KeyCode::Enter => self.handle_enter(),
+                    KeyCode::Char('e') | KeyCode::Char(' ') => self.handle_space(),
                     _ => {}
                 }
             }
