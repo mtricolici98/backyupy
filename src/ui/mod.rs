@@ -10,7 +10,8 @@ use ratatui::widgets::{
 };
 use ratatui::{Frame, Terminal};
 
-use crate::ui::state::{AppState, MenuMode, SelectedMenu, SubMenuState};
+use crate::fs_ops::dir::{FsEntry, FsEntryType};
+use crate::ui::state::{AppState, LogLevel, MenuMode, SelectedMenu, SubMenuState};
 
 pub mod state;
 
@@ -19,7 +20,7 @@ pub fn render(frame: &mut Frame, app_state: &mut AppState) {
     let vertical = Layout::vertical([
         Constraint::Length(1),
         Constraint::Fill(1),
-        Constraint::Length(1),
+        Constraint::Length(5),
     ])
     .spacing(1);
 
@@ -53,6 +54,7 @@ pub fn render(frame: &mut Frame, app_state: &mut AppState) {
         frame,
         bottom,
         app_state.selected_state == SelectedMenu::Bottom,
+        &mut app_state.bot,
     );
 }
 
@@ -126,6 +128,14 @@ pub fn render_mount_list(
     }
 }
 
+fn file_name(entry: &FsEntry) -> String {
+    let icon: String = match entry.e_type {
+        FsEntryType::Folder => "🗀".into(),
+        _ => String::new(),
+    };
+    format!("{} {}", icon, entry.name)
+}
+
 pub fn render_dir_list(
     frame: &mut Frame,
     area: Rect,
@@ -138,7 +148,7 @@ pub fn render_dir_list(
         .curr_list
         .iter()
         .map(|x| {
-            ListItem::new(x.name.clone()).style(if x.ignored {
+            ListItem::new(file_name(x)).style(if x.ignored {
                 Color::Yellow
             } else {
                 Color::Reset
@@ -182,10 +192,15 @@ pub fn render_right_list(
     }
 }
 
-pub fn render_bottom_list(frame: &mut Frame, area: Rect, is_selected: bool) {
+pub fn render_bottom_list(
+    frame: &mut Frame,
+    area: Rect,
+    is_selected: bool,
+    state: &mut SubMenuState,
+) {
     let block = Block::new()
         .title(
-            " Use ◄ ► to change tab, ▲ ▼  to scroll, Enter to change change dir, Escape to go back",
+            "Use ◄ ► to change tab, ▲ ▼  to scroll, Enter to change change dir, Escape to go back, Space to ignore, `c` to confirm",
         )
         .borders(Borders::TOP)
         .border_type(if is_selected {
@@ -193,5 +208,26 @@ pub fn render_bottom_list(frame: &mut Frame, area: Rect, is_selected: bool) {
         } else {
             BorderType::Plain
         });
-    frame.render_widget(block, area);
+    let items: Vec<ListItem> = state
+        .log_list
+        .logs
+        .iter()
+        .map(|x| {
+            ListItem::new(x.message.clone()).style(match x.level {
+                LogLevel::Warn => Color::Yellow,
+                LogLevel::Error => Color::Red,
+                _ => Color::Reset,
+            })
+        })
+        .collect();
+
+    let list = List::new(items)
+        .style(Color::White)
+        .highlight_style(Style::new().yellow().italic())
+        .highlight_symbol("> ".red())
+        .scroll_padding(1)
+        .direction(ListDirection::BottomToTop)
+        .repeat_highlight_symbol(true)
+        .block(block);
+    frame.render_stateful_widget(list, area, &mut state.log_list.list_state);
 }

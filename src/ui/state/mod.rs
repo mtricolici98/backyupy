@@ -40,25 +40,24 @@ impl DirListState {
         instance
     }
 
-    fn move_dir(&mut self) {
+    fn move_dir(&mut self) -> anyhow::Result<()> {
         let selected = self.list_state.selected();
         let Some(selected_idx) = selected else {
-            return;
+            return Ok(());
         };
         let Some(selected_item) = self.curr_list.get(selected_idx) else {
-            return;
+            return Ok(());
         };
         if selected_item.e_type == FsEntryType::Folder {
             let path = selected_item.abs_path.clone();
-            let Ok(new_list) = list_dir_own(Path::new(&path)) else {
-                return;
-            };
+            let new_list = list_dir_own(Path::new(&path))?;
             self.curr_list = new_list;
             self.source_path_stack
                 .push((selected_idx, self.curr_path.clone()));
             self.curr_path = path;
             self.list_state.select(Some(0));
         }
+        Ok(())
     }
 
     fn pop_dir(&mut self) {
@@ -111,6 +110,7 @@ impl MoveUpDown for MountListState {
 pub struct SubMenuState {
     pub dir_list: DirListState,
     pub mount_list: MountListState,
+    pub log_list: LogMenuState,
     pub selected_mount: Option<String>,
     pub menu_mode: MenuMode,
     pub mount_select_allowed: bool,
@@ -140,12 +140,32 @@ pub enum SelectedMenu {
     Bottom,
 }
 
+#[derive(Default, PartialEq)]
+pub enum LogLevel {
+    #[default]
+    Info,
+    Warn,
+    Error,
+}
+
+pub struct LogEntry {
+    pub level: LogLevel,
+    pub message: String,
+}
+
+#[derive(Default)]
+pub struct LogMenuState {
+    pub logs: Vec<LogEntry>,
+    pub list_state: ListState,
+}
+
 #[derive(Default)]
 pub struct AppState {
     pub start_path: String,
     pub left: SubMenuState,
     pub right: SubMenuState,
     pub selected_state: SelectedMenu,
+    pub bot: SubMenuState,
 }
 
 impl AppState {
@@ -155,7 +175,7 @@ impl AppState {
         } else if self.selected_state == SelectedMenu::Right {
             return &mut self.right;
         }
-        return &mut self.left;
+        return &mut self.bot;
     }
 
     pub fn get_list_to_move(submenu: &mut SubMenuState) -> Box<&mut dyn MoveUpDown> {
@@ -181,7 +201,12 @@ impl AppState {
     pub fn handle_enter(&mut self) {
         let to_modify = self.get_state_to_modify();
         if to_modify.menu_mode == MenuMode::Dir {
-            to_modify.dir_list.move_dir();
+            if let Err(e) = to_modify.dir_list.move_dir() {
+                self.bot.log_list.logs.push(LogEntry {
+                    level: LogLevel::Error,
+                    message: format!("{:?}", e),
+                });
+            }
         }
     }
 
@@ -191,7 +216,18 @@ impl AppState {
             let Some(selected) = to_modify.dir_list.list_state.selected() else {
                 return;
             };
-            let res = mark_for_ignore(&mut to_modify.dir_list.curr_list, selected);
+            let mark_for_ignore = mark_for_ignore(&mut to_modify.dir_list.curr_list, selected);
+            if let Err(e) = mark_for_ignore {
+                self.bot.log_list.logs.push(LogEntry {
+                    level: LogLevel::Error,
+                    message: format!("{:?}", e),
+                });
+            } else {
+                self.bot.log_list.logs.push(LogEntry {
+                    level: LogLevel::Info,
+                    message: "Ignore list modified".to_string(),
+                });
+            }
         }
     }
 
