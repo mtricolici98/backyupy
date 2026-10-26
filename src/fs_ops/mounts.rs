@@ -1,4 +1,6 @@
-use sysinfo::Disks;
+use std::{collections::HashMap, path::Path};
+
+use lsblk::{BlockDevice, Mount as LsblkMount};
 
 pub struct Mount {
     pub fs_type: String,
@@ -6,21 +8,39 @@ pub struct Mount {
     pub mounted_to: Option<String>,
     pub total_space: u64,
 }
-pub fn get_avail_mounts() -> Vec<Mount> {
-    Disks::new_with_refreshed_list()
-        .list()
-        .iter()
-        .filter_map(|d| {
-            if d.is_read_only() || !d.is_removable() {
-                return None;
-            }
+
+pub fn get_all_devices() -> anyhow::Result<Vec<Mount>> {
+    let devices = BlockDevice::list()?;
+    let mount_list = LsblkMount::list()?;
+
+    let mounted: HashMap<String, LsblkMount> = mount_list
+        .into_iter()
+        .map(|mount| {
+            // Convert "/dev/sda1" into "sda1".
+            let key = Path::new(&mount.device)
+                .file_name()
+                .and_then(|name| name.to_str())
+                .unwrap_or(&mount.device)
+                .to_owned();
+
+            (key, mount)
+        })
+        .collect();
+
+    Ok(devices
+        .into_iter()
+        .filter_map(|device| {
+            let mount = mounted.get(&device.name);
+
             Some(Mount {
-                fs_type: d.file_system().to_str()?.to_owned(),
-                dev: d.name().to_str()?.to_owned(),
-                mounted_to: d.mount_point().to_str().map(String::from),
-                total_space: d.total_space(),
+                fs_type: mount.map(|m| m.fstype.clone()).unwrap_or_default(),
+
+                dev: device.fullname.to_string_lossy().into_owned(),
+
+                mounted_to: mount.map(|m| m.mountpoint.to_string_lossy().into_owned()),
+
+                total_space: device.capacity().ok().flatten()? * 512,
             })
         })
-        .collect()
+        .collect())
 }
-

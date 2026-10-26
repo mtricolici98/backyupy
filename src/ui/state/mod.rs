@@ -4,7 +4,7 @@ use ratatui::widgets::ListState;
 
 use crate::fs_ops::{
     dir::{FsEntry, FsEntryType, list_dir_own, mark_for_ignore},
-    mounts::{Mount, get_avail_mounts},
+    mounts::{Mount, get_all_devices},
 };
 
 #[derive(Default, PartialEq)]
@@ -90,7 +90,7 @@ pub struct MountListState {
 impl MountListState {
     pub fn new() -> Self {
         let mut instance = MountListState::default();
-        instance.curr_list = get_avail_mounts();
+        instance.curr_list = get_all_devices().expect("Unable to read mounted devices");
         instance.list_state.select(Some(0));
         instance
     }
